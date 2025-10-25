@@ -13,7 +13,7 @@ echo "✅ Prerequisites check passed"
 
 # Create required directories
 echo "📁 Creating local directories..."
-mkdir -p data/samples
+mkdir -p schemas/samples
 mkdir -p airflow/logs
 mkdir -p spark-jobs/logs
 
@@ -51,7 +51,7 @@ echo "✅ Airflow is ready"
 
 # Generate sample data
 echo "📊 Generating sample e-commerce data..."
-cd data/samples
+cd schemas/samples
 pip install -q faker pandas pyarrow >/dev/null 2>&1
 python generate_sample_data.py
 cd ../..
@@ -60,7 +60,7 @@ echo "✅ Sample data generated"
 # Upload sample data to MinIO
 echo "⬆️  Uploading sample data to MinIO..."
 docker run --rm --network gridata-network \
-    -v $(pwd)/data/samples:/data \
+    -v $(pwd)/schemas/samples:/data \
     minio/mc:latest sh -c "
     mc alias set local http://minio:9000 minioadmin minioadmin123 && \
     mc cp /data/orders.jsonl local/gridata-raw/raw/ecommerce/orders/2024-01-01/ && \

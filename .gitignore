@@ -42,10 +42,10 @@ metastore_db/
 .DS_Store
 
 # Data
-data/samples/*.parquet
-data/samples/*.csv
-data/samples/*.jsonl
-data/samples/orders_sample.json
+schemas/samples/*.parquet
+schemas/samples/*.csv
+schemas/samples/*.jsonl
+schemas/samples/orders_sample.json
 
 # Secrets
 *.pem

@@ -71,7 +71,7 @@ Drop Folder → Airflow → MinIO (S3) → Spark → Iceberg Tables → DataHub 
 
 4. **Generate sample e-commerce data**
    ```bash
-   cd data/samples
+   cd schemas/samples
    pip install faker pandas pyarrow
    python generate_sample_data.py
    ```
@@ -79,7 +79,7 @@ Drop Folder → Airflow → MinIO (S3) → Spark → Iceberg Tables → DataHub 
 5. **Upload sample data to MinIO**
    ```bash
    mc alias set local http://localhost:9000 minioadmin minioadmin123
-   mc cp data/samples/orders.jsonl local/Gridata-raw/raw/ecommerce/orders/2024-01-01/
+   mc cp schemas/samples/orders.jsonl local/Gridata-raw/raw/ecommerce/orders/2024-01-01/
    ```
 
 6. **Trigger Airflow DAG**
@@ -146,12 +146,17 @@ Gridata/
 │   │   ├── customer_360.py
 │   │   └── quality_checks.py
 │   └── tests/
-├── data/                  # Data schemas and samples
-│   ├── schemas/
+├── schemas/               # Data schemas and samples
+│   ├── avro/
 │   │   ├── orders.json
 │   │   └── customers.json
 │   └── samples/
 │       └── generate_sample_data.py
+├── storage/               # Storage metadata configurations
+│   └── ingestion/
+│       ├── iceberg_ingestion.yml
+│       ├── airflow_ingestion.yml
+│       └── s3_ingestion.yml
 ├── docker-compose.yml     # Local development stack
 ├── .github/
 │   └── workflows/

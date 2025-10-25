@@ -63,15 +63,15 @@ Located in `spark-jobs/src/`:
 - [customer_360.py](../spark-jobs/src/customer_360.py) - Customer 360 view
 
 ### DataHub Recipes
-Located in `datahub/recipes/`:
-- [iceberg_ingestion.yml](../datahub/recipes/iceberg_ingestion.yml) - Iceberg metadata
-- [airflow_ingestion.yml](../datahub/recipes/airflow_ingestion.yml) - Airflow lineage
-- [s3_ingestion.yml](../datahub/recipes/s3_ingestion.yml) - MinIO catalog
+Located in `storage/ingestion/`:
+- [iceberg_ingestion.yml](../storage/ingestion/iceberg_ingestion.yml) - Iceberg metadata
+- [airflow_ingestion.yml](../storage/ingestion/airflow_ingestion.yml) - Airflow lineage
+- [s3_ingestion.yml](../storage/ingestion/s3_ingestion.yml) - MinIO catalog
 
 ### Data Schemas
-Located in `data/schemas/`:
-- [orders.json](../data/schemas/orders.json) - Order schema (Avro)
-- [customers.json](../data/schemas/customers.json) - Customer schema (Avro)
+Located in `schemas/avro/`:
+- [orders.json](../schemas/avro/orders.json) - Order schema (Avro)
+- [customers.json](../schemas/avro/customers.json) - Customer schema (Avro)
 
 ### Scripts
 Located in `scripts/`:
@@ -103,7 +103,7 @@ Located in `scripts/`:
 **Data Analysts**
 1. [Project Summary](PROJECT_SUMMARY.md)
 2. [Data Flow](architecture/data-flow.md)
-3. [Sample Data](../data/samples/)
+3. [Sample Data](../schemas/samples/)
 
 ## 📚 External Resources
 

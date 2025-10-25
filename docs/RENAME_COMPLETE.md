@@ -33,7 +33,7 @@ All references to "Glacier" have been successfully renamed to **"Gridata"** thro
 - `airflow/dags/*.py` - All DAG definitions
 - `spark-jobs/src/*.py` - All Spark applications
 - `spark-jobs/manifests/*.yaml` - Kubernetes manifests
-- `datahub/recipes/*.yml` - DataHub ingestion recipes
+- `storage/ingestion/*.yml` - DataHub ingestion recipes
 - `scripts/*.sh` - All automation scripts
 - `docker-compose.yml` - Local development stack
 - `.github/workflows/ci.yml` - CI/CD pipeline

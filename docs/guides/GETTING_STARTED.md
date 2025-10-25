@@ -194,7 +194,7 @@ The pipeline will:
 ### Generate More Sample Data
 
 ```bash
-cd data/samples
+cd schemas/samples
 python generate_sample_data.py
 ```
 
@@ -315,7 +315,7 @@ Now that you have Gridata running locally:
 2. **🔧 Customize Pipelines**
    - Modify existing DAGs in `airflow/dags/`
    - Add new Spark jobs in `spark-jobs/src/`
-   - Update schemas in `data/schemas/`
+   - Update schemas in `schemas/avro/`
 
 3. **🧪 Experiment**
    - Try different data volumes

@@ -28,7 +28,7 @@ local-clean: ## Stop and remove all local data
 	@echo "Cleaning Gridata local environment..."
 	docker-compose down -v
 	rm -rf airflow/logs/*
-	rm -rf data/samples/*.parquet data/samples/*.csv data/samples/*.jsonl
+	rm -rf schemas/samples/*.parquet schemas/samples/*.csv schemas/samples/*.jsonl
 
 test: ## Run all tests
 	@echo "Running Terraform validation..."
@@ -61,7 +61,7 @@ format: ## Format code
 
 generate-data: ## Generate sample e-commerce data
 	@echo "Generating sample data..."
-	cd data/samples && python generate_sample_data.py
+	cd schemas/samples && python generate_sample_data.py
 
 deploy-dev: ## Deploy to development environment
 	@bash scripts/deploy-dev.sh
