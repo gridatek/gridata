@@ -60,10 +60,32 @@ jobs:
           # Start Docker Compose services
           docker compose up -d
 
+          # Give services a moment to start
+          sleep 10
+
+          # Show what's running
+          echo "📊 Initial container status:"
+          docker compose ps
+
       - name: Wait for core services
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           echo "⏳ Waiting for services to be ready..."
+
+          # Wait for PostgreSQL first (others depend on it)
+          echo "Checking PostgreSQL..."
+          for i in {1..60}; do
+            if docker exec gridata-postgres pg_isready -U gridata -h localhost 2>/dev/null; then
+              echo "✅ PostgreSQL is ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "⚠️  PostgreSQL taking longer than expected, checking logs..."
+              docker logs gridata-postgres --tail 20
+            fi
+            echo "  Attempt $i/60: Waiting for PostgreSQL..."
+            sleep 5
+          done
 
           # Wait for MinIO
           echo "Checking MinIO..."
@@ -73,29 +95,22 @@ jobs:
               break
             fi
             echo "  Attempt $i/30: Waiting for MinIO..."
-            sleep 10
+            sleep 5
           done
 
-          # Wait for PostgreSQL
-          echo "Checking PostgreSQL..."
-          for i in {1..30}; do
-            if docker exec gridata-postgres pg_isready -U gridata 2>/dev/null; then
-              echo "✅ PostgreSQL is ready"
-              break
-            fi
-            echo "  Attempt $i/30: Waiting for PostgreSQL..."
-            sleep 10
-          done
-
-          # Wait for Airflow
+          # Wait for Airflow (needs PostgreSQL)
           echo "Checking Airflow..."
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl -f http://localhost:8080/health 2>/dev/null; then
               echo "✅ Airflow is ready"
               break
             fi
-            echo "  Attempt $i/60: Waiting for Airflow..."
-            sleep 10
+            if [ $i -eq 60 ]; then
+              echo "⚠️  Airflow taking longer than expected, checking logs..."
+              docker logs gridata-airflow-webserver --tail 30
+            fi
+            echo "  Attempt $i/90: Waiting for Airflow..."
+            sleep 5
           done
 
       - name: Check service status
