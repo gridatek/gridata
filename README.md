@@ -3,6 +3,7 @@
 > Enterprise-ready, cloud-native big data platform built on Apache Spark, Apache Iceberg, MinIO, Airflow, Terraform, and HashiCorp Vault.
 
 [![CI/CD](https://github.com/your-org/Gridata/workflows/Gridata%20CI/CD/badge.svg)](https://github.com/your-org/Gridata/actions)
+[![Test Local Setup](https://github.com/your-org/gridata/workflows/Test%20Local%20Setup%20(Linux)/badge.svg)](https://github.com/your-org/gridata/actions?query=workflow%3A%22Test+Local+Setup+%28Linux%29%22)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Overview
