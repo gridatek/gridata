@@ -1,0 +1,91 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: process-orders-{{ ds_nodash }}
+  namespace: spark-operator
+spec:
+  type: Python
+  mode: cluster
+  image: "your-registry/gridata/spark-jobs:latest"
+  imagePullPolicy: Always
+  mainApplicationFile: local:///opt/spark-jobs/src/process_orders.py
+  arguments:
+    - "s3a://gridata-raw/raw/ecommerce/orders/{{ ds }}/orders.parquet"
+    - "{{ ds }}"
+
+  sparkVersion: "3.5.0"
+
+  restartPolicy:
+    type: OnFailure
+    onFailureRetries: 3
+    onFailureRetryInterval: 10
+    onSubmissionFailureRetries: 5
+    onSubmissionFailureRetryInterval: 20
+
+  driver:
+    cores: 2
+    coreLimit: "2000m"
+    memory: "4g"
+    labels:
+      version: 3.5.0
+      app: process-orders
+    serviceAccount: spark-operator-spark
+    env:
+      - name: MINIO_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: access-key
+      - name: MINIO_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: secret-key
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: spark
+        effect: NoSchedule
+
+  executor:
+    cores: 2
+    instances: 3
+    memory: "4g"
+    labels:
+      version: 3.5.0
+      app: process-orders
+    env:
+      - name: MINIO_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: access-key
+      - name: MINIO_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: secret-key
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: spark
+        effect: NoSchedule
+
+  sparkConf:
+    "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    "spark.sql.catalog.gridata": "org.apache.iceberg.spark.SparkCatalog"
+    "spark.sql.catalog.gridata.type": "hadoop"
+    "spark.sql.catalog.gridata.warehouse": "s3a://gridata-curated/warehouse"
+    "spark.hadoop.fs.s3a.endpoint": "http://minio.minio.svc.cluster.local:9000"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "spark.hadoop.fs.s3a.connection.ssl.enabled": "false"
+    "spark.eventLog.enabled": "true"
+    "spark.eventLog.dir": "s3a://gridata-curated/spark-logs"
+
+  monitoring:
+    exposeDriverMetrics: true
+    exposeExecutorMetrics: true
+    prometheus:
+      jmxExporterJar: "/prometheus/jmx_prometheus_javaagent-0.17.0.jar"
+      port: 8090

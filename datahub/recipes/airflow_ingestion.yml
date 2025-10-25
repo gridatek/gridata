@@ -1,0 +1,54 @@
+# DataHub Ingestion Recipe for Airflow Metadata
+# Run: datahub ingest -c airflow_ingestion.yml
+
+source:
+  type: airflow
+  config:
+    # Airflow connection
+    conn_id: "postgres_metadata"
+    host: "postgres.airflow.svc.cluster.local:5432"
+    database: "airflow"
+    username: "${AIRFLOW_DB_USER}"
+    password: "${AIRFLOW_DB_PASSWORD}"
+
+    # Incremental lineage extraction
+    start_date: "2024-01-01"
+    end_date: "2024-12-31"
+
+    # Capture lineage from DAG runs
+    capture_ownership_info: true
+    capture_tags_info: true
+
+    # DAG patterns
+    dag_pattern:
+      allow:
+        - "ecommerce_.*"
+        - "analytics_.*"
+      deny:
+        - "example_.*"
+        - "tutorial_.*"
+
+    # Extract task dependencies for lineage
+    extract_lineage: true
+
+    # Operator to dataset mappings
+    inlets_and_outlets: true
+
+sink:
+  type: datahub-rest
+  config:
+    server: "http://datahub-gms.datahub.svc.cluster.local:8080"
+    token: "${DATAHUB_TOKEN}"
+
+transformers:
+  - type: "simple_add_dataset_ownership"
+    config:
+      owner_urns:
+        - "urn:li:corpuser:airflow-admin"
+      ownership_type: "DATAOWNER"
+
+  - type: "simple_add_dataset_tags"
+    config:
+      tag_urns:
+        - "urn:li:tag:Airflow"
+        - "urn:li:tag:Orchestration"

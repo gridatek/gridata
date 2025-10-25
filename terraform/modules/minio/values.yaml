@@ -1,0 +1,56 @@
+mode: distributed
+
+replicas: ${replicas}
+
+persistence:
+  enabled: true
+  storageClass: "${storage_class}"
+  size: ${storage_size}
+
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "2000m"
+
+securityContext:
+  enabled: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+ingress:
+  enabled: ${enable_tls}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - ${ingress_host}
+  tls:
+    - secretName: minio-tls
+      hosts:
+        - ${ingress_host}
+
+consoleIngress:
+  enabled: ${enable_tls}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - ${console_host}
+  tls:
+    - secretName: minio-console-tls
+      hosts:
+        - ${console_host}
+
+environment:
+  MINIO_BROWSER: "on"
+  MINIO_SERVER_URL: "https://${ingress_host}"
+  MINIO_BROWSER_REDIRECT_URL: "https://${console_host}"
+
+metrics:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring

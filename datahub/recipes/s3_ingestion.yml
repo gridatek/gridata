@@ -1,0 +1,54 @@
+# DataHub Ingestion Recipe for MinIO/S3 Buckets
+# Run: datahub ingest -c s3_ingestion.yml
+
+source:
+  type: s3
+  config:
+    # MinIO endpoint (S3-compatible)
+    endpoint_url: "http://minio.minio.svc.cluster.local:9000"
+    aws_access_key_id: "${MINIO_ACCESS_KEY}"
+    aws_secret_access_key: "${MINIO_SECRET_KEY}"
+
+    # Buckets to scan
+    bucket_patterns:
+      allow:
+        - "gridata-raw"
+        - "gridata-curated"
+      deny:
+        - "gridata-archive"
+
+    # Path patterns
+    path_specs:
+      - include: "raw/ecommerce/**/*.parquet"
+        table_name: "raw_ecommerce_files"
+
+      - include: "curated/analytics/**/*.parquet"
+        table_name: "curated_analytics_files"
+
+    # Profiling
+    profiling:
+      enabled: true
+      max_workers: 4
+
+    # Extract schema from Parquet files
+    use_s3_bucket_tags: true
+    use_s3_object_tags: true
+
+sink:
+  type: datahub-rest
+  config:
+    server: "http://datahub-gms.datahub.svc.cluster.local:8080"
+    token: "${DATAHUB_TOKEN}"
+
+transformers:
+  - type: "simple_add_dataset_ownership"
+    config:
+      owner_urns:
+        - "urn:li:corpuser:data-platform"
+      ownership_type: "DATAOWNER"
+
+  - type: "simple_add_dataset_tags"
+    config:
+      tag_urns:
+        - "urn:li:tag:MinIO"
+        - "urn:li:tag:ObjectStorage"

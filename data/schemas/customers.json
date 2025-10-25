@@ -1,0 +1,77 @@
+{
+  "type": "record",
+  "name": "Customer",
+  "namespace": "com.glacier.ecommerce",
+  "fields": [
+    {
+      "name": "customer_id",
+      "type": "string",
+      "doc": "Unique customer identifier"
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "doc": "Customer email address (PII)"
+    },
+    {
+      "name": "first_name",
+      "type": "string",
+      "doc": "Customer first name (PII)"
+    },
+    {
+      "name": "last_name",
+      "type": "string",
+      "doc": "Customer last name (PII)"
+    },
+    {
+      "name": "phone",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Customer phone number (PII)"
+    },
+    {
+      "name": "date_of_birth",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Date of birth in YYYY-MM-DD format (PII)"
+    },
+    {
+      "name": "gender",
+      "type": ["null", {
+        "type": "enum",
+        "name": "Gender",
+        "symbols": ["male", "female", "other", "prefer_not_to_say"]
+      }],
+      "default": null
+    },
+    {
+      "name": "registration_date",
+      "type": "string",
+      "doc": "Account registration timestamp"
+    },
+    {
+      "name": "customer_tier",
+      "type": {
+        "type": "enum",
+        "name": "CustomerTier",
+        "symbols": ["bronze", "silver", "gold", "platinum"]
+      },
+      "default": "bronze"
+    },
+    {
+      "name": "marketing_opt_in",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "preferred_language",
+      "type": "string",
+      "default": "en"
+    },
+    {
+      "name": "preferred_currency",
+      "type": "string",
+      "default": "USD"
+    }
+  ]
+}

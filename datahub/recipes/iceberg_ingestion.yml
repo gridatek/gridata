@@ -1,0 +1,77 @@
+# DataHub Ingestion Recipe for Iceberg Tables
+# Run: datahub ingest -c iceberg_ingestion.yml
+
+source:
+  type: iceberg
+  config:
+    # Iceberg catalog configuration
+    catalog:
+      type: rest
+      uri: "http://iceberg-catalog.gridata.svc.cluster.local:8181"
+
+    # MinIO/S3 connection for Iceberg warehouse
+    s3:
+      endpoint: "http://minio.minio.svc.cluster.local:9000"
+      access_key_id: "${MINIO_ACCESS_KEY}"
+      secret_access_key: "${MINIO_SECRET_KEY}"
+      path_style_access: true
+
+    # Table patterns to include/exclude
+    table_pattern:
+      allow:
+        - "gridata.ecommerce.*"
+        - "gridata.analytics.*"
+      deny:
+        - "*.temp_*"
+        - "*.staging_*"
+
+    # Profiling configuration
+    profiling:
+      enabled: true
+      profile_table_level_only: false
+      include_field_null_count: true
+      include_field_min_value: true
+      include_field_max_value: true
+      include_field_mean_value: true
+      max_number_of_fields_to_profile: 50
+
+    # Stateful ingestion for incremental updates
+    stateful_ingestion:
+      enabled: true
+
+sink:
+  type: datahub-rest
+  config:
+    server: "http://datahub-gms.datahub.svc.cluster.local:8080"
+    token: "${DATAHUB_TOKEN}"
+    timeout_sec: 30
+
+transformers:
+  - type: "simple_add_dataset_ownership"
+    config:
+      owner_urns:
+        - "urn:li:corpuser:data-engineering"
+      ownership_type: "DATAOWNER"
+
+  - type: "simple_add_dataset_tags"
+    config:
+      tag_urns:
+        - "urn:li:tag:Production"
+        - "urn:li:tag:Iceberg"
+
+  - type: "simple_add_dataset_domain"
+    config:
+      domains:
+        - id: "urn:li:domain:ecommerce"
+
+  - type: "pattern_add_dataset_schema_tags"
+    config:
+      tag_pattern:
+        rules:
+          # Tag PII fields
+          ".*email.*|.*phone.*|.*address.*":
+            - "urn:li:tag:PII"
+          ".*customer_id.*":
+            - "urn:li:tag:CustomerData"
+          ".*amount.*|.*price.*|.*revenue.*":
+            - "urn:li:tag:Financial"

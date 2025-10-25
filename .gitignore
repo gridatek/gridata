@@ -1,0 +1,72 @@
+# Terraform
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+tfplan
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Airflow
+airflow/logs/
+airflow.db
+airflow.cfg
+unittests.cfg
+airflow-webserver.pid
+
+# Spark
+spark-warehouse/
+derby.log
+metastore_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data
+data/samples/*.parquet
+data/samples/*.csv
+data/samples/*.jsonl
+data/samples/orders_sample.json
+
+# Secrets
+*.pem
+*.key
+*.crt
+.env
+.env.local
+secrets/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Backup files
+*.bak
+*.tmp
+*.backup

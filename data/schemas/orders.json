@@ -1,0 +1,99 @@
+{
+  "type": "record",
+  "name": "Order",
+  "namespace": "com.glacier.ecommerce",
+  "fields": [
+    {
+      "name": "order_id",
+      "type": "string",
+      "doc": "Unique order identifier"
+    },
+    {
+      "name": "customer_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Customer identifier"
+    },
+    {
+      "name": "order_date",
+      "type": "string",
+      "doc": "Order timestamp in ISO 8601 format"
+    },
+    {
+      "name": "order_status",
+      "type": {
+        "type": "enum",
+        "name": "OrderStatus",
+        "symbols": ["pending", "processing", "shipped", "delivered", "cancelled", "returned"]
+      },
+      "doc": "Current order status"
+    },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "OrderItem",
+          "fields": [
+            {"name": "product_id", "type": "string"},
+            {"name": "product_name", "type": "string"},
+            {"name": "category", "type": "string"},
+            {"name": "quantity", "type": "int"},
+            {"name": "unit_price", "type": "double"},
+            {"name": "discount_pct", "type": "double", "default": 0.0}
+          ]
+        }
+      },
+      "doc": "List of items in the order"
+    },
+    {
+      "name": "subtotal",
+      "type": "double",
+      "doc": "Order subtotal before tax and shipping"
+    },
+    {
+      "name": "tax",
+      "type": "double",
+      "doc": "Tax amount"
+    },
+    {
+      "name": "shipping_cost",
+      "type": "double",
+      "doc": "Shipping cost"
+    },
+    {
+      "name": "discount",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Total discount applied"
+    },
+    {
+      "name": "shipping_address",
+      "type": {
+        "type": "record",
+        "name": "Address",
+        "fields": [
+          {"name": "street", "type": "string"},
+          {"name": "city", "type": "string"},
+          {"name": "state", "type": "string"},
+          {"name": "postal_code", "type": "string"},
+          {"name": "country", "type": "string"}
+        ]
+      }
+    },
+    {
+      "name": "payment_method",
+      "type": {
+        "type": "enum",
+        "name": "PaymentMethod",
+        "symbols": ["credit_card", "debit_card", "paypal", "bank_transfer", "crypto"]
+      }
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "doc": "Order source (web, mobile, api)"
+    }
+  ]
+}

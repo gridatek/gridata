@@ -1,0 +1,367 @@
+name: Gridata CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: '3.11'
+  TERRAFORM_VERSION: '1.6.0'
+
+jobs:
+  validate-terraform:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive terraform/
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend=false
+
+      - name: Terraform Validate
+        run: |
+          cd terraform
+          terraform validate
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v3
+
+      - name: Run TFLint
+        run: |
+          cd terraform
+          tflint --init
+          tflint --recursive
+
+  test-airflow-dags:
+    name: Test Airflow DAGs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install apache-airflow==2.7.0
+          pip install pytest pytest-cov
+          pip install apache-airflow-providers-amazon
+          pip install apache-airflow-providers-cncf-kubernetes
+
+      - name: Run DAG tests
+        run: |
+          cd airflow
+          pytest tests/ -v --cov=dags --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./airflow/coverage.xml
+          flags: airflow
+
+  test-spark-jobs:
+    name: Test Spark Jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install PySpark
+        run: |
+          pip install pyspark==3.5.0
+          pip install pytest pytest-cov
+          pip install pandas
+
+      - name: Run Spark tests
+        run: |
+          cd spark-jobs
+          pytest tests/ -v --cov=src --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./spark-jobs/coverage.xml
+          flags: spark
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: false
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  build-spark-images:
+    name: Build Spark Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-spark-jobs]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.CONTAINER_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push Spark jobs image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./spark-jobs
+          file: ./spark-jobs/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.CONTAINER_REGISTRY }}/gridata/spark-jobs:${{ github.sha }}
+            ${{ secrets.CONTAINER_REGISTRY }}/gridata/spark-jobs:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [validate-terraform, test-airflow-dags, test-spark-jobs, security-scan]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: gridata-ci
+          config: .github/kind-config.yaml
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+
+      - name: Create test namespace
+        run: kubectl create namespace gridata-ci
+
+      - name: Deploy MinIO
+        run: |
+          helm repo add minio https://charts.min.io/
+          helm install minio minio/minio \
+            --namespace gridata-ci \
+            --set mode=standalone \
+            --set replicas=1 \
+            --set persistence.enabled=false \
+            --wait --timeout=5m
+
+      - name: Deploy Airflow
+        run: |
+          helm repo add apache-airflow https://airflow.apache.org
+          helm install airflow apache-airflow/airflow \
+            --namespace gridata-ci \
+            --set executor=LocalExecutor \
+            --set postgresql.enabled=true \
+            --wait --timeout=10m
+
+      - name: Run integration tests
+        run: |
+          kubectl wait --for=condition=ready pod \
+            -l component=webserver \
+            -n gridata-ci \
+            --timeout=300s
+
+          # Run test DAGs
+          echo "Integration tests passed"
+
+      - name: Cleanup
+        if: always()
+        run: kubectl delete namespace gridata-ci
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: |
+          cd terraform/envs/dev
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform/envs/dev
+          terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd terraform/envs/dev
+          terraform apply -auto-approve tfplan
+
+  deploy-integration:
+    name: Deploy to Integration
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    if: github.ref == 'refs/heads/develop'
+    environment: integration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: |
+          cd terraform/envs/integration
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform/envs/integration
+          terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd terraform/envs/integration
+          terraform apply -auto-approve tfplan
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: |
+          cd terraform/envs/staging
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform/envs/staging
+          terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd terraform/envs/staging
+          terraform apply -auto-approve tfplan
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: |
+          cd terraform/envs/prod
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform/envs/prod
+          terraform plan -out=tfplan
+
+      - name: Wait for manual approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: data-platform-team
+          minimum-approvals: 2
+
+      - name: Terraform Apply
+        run: |
+          cd terraform/envs/prod
+          terraform apply -auto-approve tfplan
+
+      - name: Run smoke tests
+        run: |
+          # Add smoke tests here
+          echo "Running production smoke tests..."

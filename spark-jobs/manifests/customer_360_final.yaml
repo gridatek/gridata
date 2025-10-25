@@ -1,0 +1,80 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: customer-360-{{ ds_nodash }}
+  namespace: spark-operator
+spec:
+  type: Python
+  mode: cluster
+  image: "your-registry/gridata/spark-jobs:latest"
+  imagePullPolicy: Always
+  mainApplicationFile: local:///opt/spark-jobs/src/customer_360.py
+
+  sparkVersion: "3.5.0"
+
+  restartPolicy:
+    type: OnFailure
+    onFailureRetries: 2
+    onFailureRetryInterval: 10
+
+  driver:
+    cores: 2
+    coreLimit: "2000m"
+    memory: "4g"
+    labels:
+      version: 3.5.0
+      app: customer-360
+    serviceAccount: spark-operator-spark
+    env:
+      - name: MINIO_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: access-key
+      - name: MINIO_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: secret-key
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: spark
+        effect: NoSchedule
+
+  executor:
+    cores: 3
+    instances: 5
+    memory: "6g"
+    labels:
+      version: 3.5.0
+      app: customer-360
+    env:
+      - name: MINIO_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: access-key
+      - name: MINIO_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: spark-s3-creds
+            key: secret-key
+    tolerations:
+      - key: dedicated
+        operator: Equal
+        value: spark
+        effect: NoSchedule
+
+  sparkConf:
+    "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    "spark.sql.catalog.gridata": "org.apache.iceberg.spark.SparkCatalog"
+    "spark.sql.catalog.gridata.type": "hadoop"
+    "spark.sql.catalog.gridata.warehouse": "s3a://gridata-curated/warehouse"
+    "spark.hadoop.fs.s3a.endpoint": "http://minio.minio.svc.cluster.local:9000"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+    "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+    "spark.hadoop.fs.s3a.connection.ssl.enabled": "false"
+    "spark.sql.shuffle.partitions": "200"
+    "spark.sql.adaptive.enabled": "true"
+    "spark.sql.adaptive.coalescePartitions.enabled": "true"
