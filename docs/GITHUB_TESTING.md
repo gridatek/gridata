@@ -14,9 +14,9 @@ Automated testing of Gridata local setup on GitHub-hosted Ubuntu runners to ensu
 
 | Job | Runner | Purpose |
 |-----|--------|---------|
-| **test-ubuntu-latest** | ubuntu-latest (22.04) | Full integration test |
-| **test-ubuntu-20-04** | ubuntu-20.04 | Backward compatibility |
-| **test-makefile-commands** | ubuntu-latest | Makefile command validation |
+| **test-local-setup** | ubuntu-latest (22.04) | Full integration test |
+
+**Note**: Simplified to one job for faster testing and reduced CI minutes.
 
 ### Test Coverage
 

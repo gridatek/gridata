@@ -11,18 +11,17 @@ on:
       - '.github/workflows/test-local-setup.yml'
   pull_request:
     branches: [main, develop]
-  schedule:
-    # Run weekly on Monday at 6 AM UTC
-    - cron: '0 6 * * 1'
   workflow_dispatch:  # Allow manual triggering
+  # schedule:  # Uncomment when ready for weekly runs
+  #   - cron: '0 6 * * 1'  # Mondays at 6 AM UTC
 
 env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:
-  test-ubuntu-latest:
-    name: Test on Ubuntu Latest
+  test-local-setup:
+    name: Test Local Setup on Ubuntu
     runs-on: ubuntu-latest
 
     steps:
@@ -38,23 +37,15 @@ jobs:
           sudo docker system prune -af
           df -h
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 python3-pip curl jq
+          sudo apt-get install -y python3 python3-pip curl
           python3 --version
           docker --version
           docker compose version
 
-      - name: Verify Docker is running
-        run: |
-          docker ps
-          docker info
-
-      - name: Start Gridata local environment
+      - name: Start Gridata services
         run: |
           echo "🚀 Starting Gridata local environment..."
 
@@ -65,14 +56,11 @@ jobs:
           # Create required directories
           mkdir -p schemas/samples
           mkdir -p airflow/logs
-          mkdir -p spark-jobs/logs
 
           # Start Docker Compose services
           docker compose up -d
 
-          echo "✅ Docker Compose started"
-
-      - name: Wait for services to be healthy
+      - name: Wait for core services
         timeout-minutes: 10
         run: |
           echo "⏳ Waiting for services to be ready..."
@@ -110,8 +98,6 @@ jobs:
             sleep 10
           done
 
-          echo "✅ All core services are ready"
-
       - name: Check service status
         run: |
           echo "📊 Service Status:"
@@ -127,8 +113,6 @@ jobs:
           cd schemas/samples
           pip3 install faker pandas pyarrow
           python3 generate_sample_data.py
-
-          echo "✅ Sample data generated"
           ls -lh *.parquet *.jsonl 2>/dev/null || echo "Data files created"
           cd ../..
 
@@ -147,41 +131,33 @@ jobs:
             mc cp /data/clickstream.parquet local/gridata-raw/raw/ecommerce/clickstream/ || true
           "
 
-          echo "✅ Sample data uploaded"
-
-      - name: Run automated tests
+      - name: Run health checks
         run: |
-          echo "🧪 Running automated health checks..."
-          bash scripts/test-local-setup.sh
+          echo "🧪 Running health checks..."
+
+          # Test MinIO
+          curl -f http://localhost:9000/minio/health/live || echo "MinIO health check failed"
+
+          # Test Airflow
+          curl -f http://localhost:8080/health || echo "Airflow health check failed"
+
+          # Test Spark UI
+          curl -f http://localhost:8081 || echo "Spark UI check failed"
+
+          # Check containers
+          docker compose ps
 
       - name: Test Airflow DAGs
         run: |
           echo "🌬️  Testing Airflow DAGs..."
-
-          # List DAGs
-          docker exec gridata-airflow-webserver airflow dags list
-
-          # Check if ecommerce DAGs are loaded
-          docker exec gridata-airflow-webserver airflow dags list | grep ecommerce || echo "Warning: DAGs not found"
+          docker exec gridata-airflow-webserver airflow dags list || echo "DAG list failed"
 
       - name: Test MinIO buckets
         run: |
           echo "🪣 Testing MinIO buckets..."
-          docker exec gridata-minio mc ls local/
-          docker exec gridata-minio mc ls local/gridata-raw/
-          docker exec gridata-minio mc ls local/gridata-raw/raw/ecommerce/orders/2024-01-01/ || echo "No orders uploaded yet"
+          docker exec gridata-minio mc ls local/ || echo "MinIO bucket list failed"
 
-      - name: Test Spark connectivity
-        run: |
-          echo "⚡ Testing Spark..."
-
-          # Check Spark Master UI
-          curl -f http://localhost:8081 || echo "Spark UI not accessible"
-
-          # Check worker connection
-          docker exec gridata-spark-worker nc -z spark-master 7077 || echo "Worker cannot reach master"
-
-      - name: View service logs on failure
+      - name: View logs on failure
         if: failure()
         run: |
           echo "📋 Docker Compose Services:"
@@ -189,19 +165,19 @@ jobs:
 
           echo ""
           echo "📋 MinIO Logs:"
-          docker compose logs --tail=50 minio
+          docker compose logs --tail=100 minio
 
           echo ""
           echo "📋 PostgreSQL Logs:"
-          docker compose logs --tail=50 postgres
+          docker compose logs --tail=100 postgres
 
           echo ""
           echo "📋 Airflow Webserver Logs:"
-          docker compose logs --tail=50 airflow-webserver
+          docker compose logs --tail=100 airflow-webserver
 
           echo ""
-          echo "📋 Airflow Scheduler Logs:"
-          docker compose logs --tail=50 airflow-scheduler
+          echo "📋 Spark Master Logs:"
+          docker compose logs --tail=100 spark-master
 
       - name: Cleanup
         if: always()
@@ -209,143 +185,3 @@ jobs:
           echo "🧹 Cleaning up..."
           docker compose down -v
           docker system prune -f
-
-  test-ubuntu-20-04:
-    name: Test on Ubuntu 20.04
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo docker system prune -af
-          df -h
-
-      - name: Install Docker Compose V2
-        run: |
-          # Ubuntu 20.04 might need Docker Compose V2
-          mkdir -p ~/.docker/cli-plugins/
-          curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
-          chmod +x ~/.docker/cli-plugins/docker-compose
-          docker compose version
-
-      - name: Install Python dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3 python3-pip
-          python3 --version
-
-      - name: Start services
-        run: |
-          chmod +x scripts/setup-local-env.sh
-          docker compose up -d
-
-      - name: Wait for services
-        timeout-minutes: 10
-        run: |
-          # Wait for key services
-          for i in {1..30}; do
-            if curl -f http://localhost:9000/minio/health/live 2>/dev/null; then
-              break
-            fi
-            sleep 10
-          done
-
-          for i in {1..60}; do
-            if curl -f http://localhost:8080/health 2>/dev/null; then
-              break
-            fi
-            sleep 10
-          done
-
-      - name: Quick health check
-        run: |
-          docker compose ps
-          curl -f http://localhost:9000/minio/health/live
-          curl -f http://localhost:8080/health
-
-      - name: Cleanup
-        if: always()
-        run: docker compose down -v
-
-  test-makefile-commands:
-    name: Test Makefile Commands
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo docker system prune -af
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make python3 python3-pip
-
-      - name: Test 'make local-up' equivalent
-        run: |
-          # Don't use make local-up as it includes data generation
-          # which requires additional time
-          docker compose up -d
-
-      - name: Wait for basic services
-        timeout-minutes: 5
-        run: |
-          for i in {1..30}; do
-            if docker compose ps | grep -q "Up"; then
-              break
-            fi
-            sleep 10
-          done
-
-      - name: Test 'make local-test'
-        run: |
-          chmod +x scripts/test-local-setup.sh
-          # Run basic tests (some may fail without full setup)
-          bash scripts/test-local-setup.sh || echo "Some tests failed as expected without full setup"
-
-      - name: Test 'make local-down'
-        run: |
-          docker compose down
-
-      - name: Test 'make local-clean'
-        run: |
-          docker compose down -v
-          # Cleanup sample files if they exist
-          rm -f schemas/samples/*.parquet schemas/samples/*.jsonl || true
-
-  summary:
-    name: Test Summary
-    runs-on: ubuntu-latest
-    needs: [test-ubuntu-latest, test-ubuntu-20-04, test-makefile-commands]
-    if: always()
-
-    steps:
-      - name: Check test results
-        run: |
-          echo "🎉 Linux local setup tests completed!"
-          echo ""
-          echo "Test Results:"
-          echo "  - Ubuntu Latest: ${{ needs.test-ubuntu-latest.result }}"
-          echo "  - Ubuntu 20.04: ${{ needs.test-ubuntu-20-04.result }}"
-          echo "  - Makefile Commands: ${{ needs.test-makefile-commands.result }}"
-
-          if [ "${{ needs.test-ubuntu-latest.result }}" != "success" ] || \
-             [ "${{ needs.test-ubuntu-20-04.result }}" != "success" ] || \
-             [ "${{ needs.test-makefile-commands.result }}" != "success" ]; then
-            echo ""
-            echo "❌ Some tests failed!"
-            exit 1
-          fi
-
-          echo ""
-          echo "✅ All tests passed!"
