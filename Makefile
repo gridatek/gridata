@@ -1,6 +1,6 @@
 # Gridata - Makefile for common development tasks
 
-.PHONY: help setup local-up local-down test clean deploy-dev deploy-integration deploy-staging deploy-prod
+.PHONY: help setup local-up local-down local-test test clean deploy-dev deploy-integration deploy-staging deploy-prod
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -29,6 +29,10 @@ local-clean: ## Stop and remove all local data
 	docker-compose down -v
 	rm -rf airflow/logs/*
 	rm -rf schemas/samples/*.parquet schemas/samples/*.csv schemas/samples/*.jsonl
+
+local-test: ## Test local environment setup
+	@echo "Testing local environment..."
+	@bash scripts/test-local-setup.sh
 
 test: ## Run all tests
 	@echo "Running Terraform validation..."

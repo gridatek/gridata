@@ -43,6 +43,16 @@ Drop Folder → Airflow → MinIO (S3) → Spark → Iceberg Tables → DataHub 
 
 ## Quick Start
 
+### 🐧 Linux Users - One Command Setup!
+
+```bash
+git clone https://github.com/your-org/Gridata.git && cd Gridata && make local-up
+```
+
+**Done!** See [QUICKSTART_LINUX.md](QUICKSTART_LINUX.md) or [full Linux guide](docs/LINUX_LOCAL_SETUP.md)
+
+---
+
 ### Prerequisites
 
 - Docker & Docker Compose
